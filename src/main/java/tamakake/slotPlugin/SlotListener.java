@@ -3,6 +3,10 @@ package tamakake.slotPlugin;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.Random;
+import java.util.List;
+import java.util.ArrayList;
+
 import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
@@ -14,16 +18,11 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.ItemFrame;
-import java.util.ArrayList;
-import java.util.List;
 import org.bukkit.scheduler.BukkitRunnable;
-import java.util.Random;
 
 public class SlotListener implements Listener {
 
     private final SlotPlugin plugin;
-
-    // 🎯 回転中プレイヤー管理
     private final Set<Player> playing = new HashSet<>();
 
     public SlotListener(SlotPlugin plugin) {
@@ -38,11 +37,24 @@ public class SlotListener implements Listener {
         Block block = e.getClickedBlock();
         if (block == null) return;
 
-        if (block.getType() != Material.LEVER) return;
-
         Player player = e.getPlayer();
+        ItemStack item = e.getItem();
 
-        e.setCancelled(true);
+        // 🎟️ チケット使用（最優先）
+        if (isTicket(item)) {
+            e.setCancelled(true);
+            item.setAmount(item.getAmount() - 1);
+
+            List<ItemFrame> frames = getFrames(block);
+            if (frames.size() != 3) {
+                player.sendMessage("§c額縁を3つ設置してください！");
+                return;
+            }
+
+            TicketSlotListener ticketSlot = new TicketSlotListener(plugin);
+            ticketSlot.startTicketSlot(player, frames);
+            return; // 通常スロットは処理しない
+        }
 
         // ❗ 連打防止
         if (playing.contains(player)) {
@@ -50,18 +62,29 @@ public class SlotListener implements Listener {
             return;
         }
 
-        List<ItemFrame> frames = getFrames(block);
-
-        if (frames.size() != 3) {
-            player.sendMessage("§c額縁を3つ設置してください！");
-            return;
+        // 🎰 通常スロット（手ぶらでもOK）
+        boolean isNormalSlot = false;
+        if (item == null) {
+            isNormalSlot = true; // 手ぶらで回す場合
+        } else if (item.getType() == Material.STICK && item.hasItemMeta() && item.getItemMeta().hasCustomModelData() && item.getItemMeta().getCustomModelData() == 9999) {
+            isNormalSlot = true;
         }
 
-        startSlot(player, frames);
+        if (isNormalSlot) {
+            e.setCancelled(true);
+
+            List<ItemFrame> frames = getFrames(block);
+            if (frames.size() != 3) {
+                player.sendMessage("§c額縁を3つ設置してください！");
+                return;
+            }
+
+            startSlot(player, frames);
+        }
     }
 
-    // 🎰 スロット開始
-    public void startSlot(Player player, List<ItemFrame> frames) {
+    // 🎰 通常スロット
+    private void startSlot(Player player, List<ItemFrame> frames) {
 
         int cost = 1000;
 
@@ -70,140 +93,110 @@ public class SlotListener implements Listener {
             return;
         }
 
-        // 🎯 回転中に追加
         playing.add(player);
-
         SlotPlugin.econ.withdrawPlayer(player, cost);
         player.sendMessage("§e" + cost + "円支払いました");
 
         List<ItemStack> items = getSlotItems();
-
         new BukkitRunnable() {
 
             int count = 0;
             Random random = new Random();
 
-            boolean win = random.nextDouble() < 0.05;
-
-            ItemStack winItem = null;
-
-            {
-                if (win) {
-                    double r = random.nextDouble();
-
-                    if (r < 0.05) {
-                        winItem = createItem(Material.NETHERITE_INGOT);
-                    } else if (r < 0.15) {
-                        winItem = createItem(Material.EMERALD);
-                    } else if (r < 0.45) {
-                        winItem = createItem(Material.DIAMOND);
-                    } else {
-                        winItem = items.get(random.nextInt(items.size()));
-                    }
-                }
-            }
-
             @Override
             public void run() {
-
+                // 15回ランダムに回転演出
                 for (ItemFrame frame : frames) {
-                    ItemStack randomItem = items.get(random.nextInt(items.size()));
-                    frame.setItem(randomItem);
+                    frame.setItem(items.get(random.nextInt(items.size())));
                 }
 
                 count++;
-
                 if (count > 15) {
                     cancel();
 
-                    if (win && winItem != null) {
+                    // 最終的に揃ったか判定
+                    ItemStack a = frames.get(0).getItem();
+                    ItemStack b = frames.get(1).getItem();
+                    ItemStack c = frames.get(2).getItem();
 
-                        for (ItemFrame frame : frames) {
-                            frame.setItem(winItem);
-                        }
-
-                        Material type = winItem.getType();
-
+                    if (isSame(a, b) && isSame(b, c)) {
+                        Material type = a.getType();
                         if (type == Material.EMERALD) {
                             player.sendMessage("§aエメラルド揃い！10万円ゲット！");
                             SlotPlugin.econ.depositPlayer(player, 100000);
-
                         } else if (type == Material.DIAMOND) {
                             player.sendMessage("§bダイヤ揃い！1万円ゲット！");
                             SlotPlugin.econ.depositPlayer(player, 10000);
-
                         } else if (type == Material.NETHERITE_INGOT) {
                             player.sendMessage("§5ネザライト揃い！チケットゲット！");
                             player.getInventory().addItem(getTicket());
-
                         } else {
-                            player.sendMessage("§e揃ったけどハズレ！");
+                            player.sendMessage("§c外れました。");
                         }
-
                     } else {
                         player.sendMessage("§c外れました。");
                     }
 
-                    // 🎯 回転終了 → 解放
                     playing.remove(player);
                 }
             }
         }.runTaskTimer(plugin, 0, 2);
     }
 
-    // 🎰 アイテム
-    public List<ItemStack> getSlotItems() {
-
+    // 🎰 通常スロット用アイテム
+    private List<ItemStack> getSlotItems() {
         List<ItemStack> items = new ArrayList<>();
-
-        items.add(createItem(Material.COPPER_INGOT));
-        items.add(createItem(Material.IRON_INGOT));
-        items.add(createItem(Material.GOLD_INGOT));
-        items.add(createItem(Material.EMERALD));
-        items.add(createItem(Material.DIAMOND));
-        items.add(createItem(Material.NETHERITE_INGOT));
-
+        items.add(createItem(Material.COPPER_INGOT,1));
+        items.add(createItem(Material.IRON_INGOT,1));
+        items.add(createItem(Material.GOLD_INGOT,1));
+        items.add(createItem(Material.EMERALD,1));
+        items.add(createItem(Material.DIAMOND,1));
+        items.add(createItem(Material.NETHERITE_INGOT,1)); // チケット用
         return items;
     }
 
-    public ItemStack createItem(Material material) {
-
+    // ItemStack作成（CustomModelData指定）
+    private ItemStack createItem(Material material, int cmd) {
         ItemStack item = new ItemStack(material);
         ItemMeta meta = item.getItemMeta();
-
         if (meta != null) {
-            meta.setCustomModelData(1);
+            meta.setCustomModelData(cmd);
             item.setItemMeta(meta);
         }
-
         return item;
     }
 
     public ItemStack getTicket() {
         ItemStack item = new ItemStack(Material.PAPER);
         ItemMeta meta = item.getItemMeta();
-
         if (meta != null) {
             meta.setDisplayName("§eスロットチケット");
             meta.setCustomModelData(7777);
             item.setItemMeta(meta);
         }
-
         return item;
     }
 
+    public boolean isTicket(ItemStack item) {
+        if (item == null) return false;
+        if (!item.hasItemMeta()) return false;
+        if (!item.getItemMeta().hasCustomModelData()) return false;
+        return item.getItemMeta().getCustomModelData() == 7777;
+    }
+
+    // ItemStack同士が同じか判定
+    public boolean isSame(ItemStack a, ItemStack b) {
+        if (a == null || b == null) return false;
+        return a.isSimilar(b);
+    }
+
+    // ブロック周囲のItemFrame取得
     public List<ItemFrame> getFrames(Block block) {
-
         List<ItemFrame> frames = new ArrayList<>();
-
         for (Entity entity : block.getWorld().getNearbyEntities(block.getLocation(), 3, 3, 3)) {
-            if (entity instanceof ItemFrame) {
-                frames.add((ItemFrame) entity);
-            }
+            if (entity instanceof ItemFrame) frames.add((ItemFrame) entity);
         }
-
         frames.sort(Comparator.comparingDouble(f -> f.getLocation().getX()));
-
         return frames;
     }
 }

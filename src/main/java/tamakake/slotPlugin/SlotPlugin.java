@@ -52,17 +52,31 @@ public final class SlotPlugin extends JavaPlugin {
         return econ != null;
     }
 
-    // コマンド処理
+    // コマンド処理（/giveslot と /getticket 両対応）
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
 
+        if (!(sender instanceof Player)) return true;
+
+        Player player = (Player) sender;
+
+        // /getticket コマンド
+        if (command.getName().equalsIgnoreCase("getticket")) {
+
+            if (!player.hasPermission("tamakake.slot.op")) {
+                player.sendMessage("§c権限がありません！");
+                return true;
+            }
+
+            SlotListener listener = new SlotListener(this);
+            player.getInventory().addItem(listener.getTicket());
+            player.sendMessage("§aスロットチケットを1枚手に入れました！");
+            return true;
+        }
+
+        // /giveslot コマンド
         if (command.getName().equalsIgnoreCase("giveslot")) {
 
-            if (!(sender instanceof Player)) return true;
-
-            Player player = (Player) sender;
-
-            // 権限チェック
             if (!player.hasPermission("tamakake.slot.op")) {
                 player.sendMessage("§c権限がありません！");
                 return true;
@@ -74,13 +88,12 @@ public final class SlotPlugin extends JavaPlugin {
 
             if (meta != null) {
                 meta.setDisplayName("§6スロット設置ツール");
-                meta.setCustomModelData(9999); // ←超重要
+                meta.setCustomModelData(9999);
                 item.setItemMeta(meta);
             }
 
             player.getInventory().addItem(item);
             player.sendMessage("§aスロットアイテムを取得！");
-
             return true;
         }
 

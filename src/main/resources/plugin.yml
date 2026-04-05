@@ -6,3 +6,8 @@ commands:
   giveslot:
     description: スロットアイテム取得
     permission: tamakake.slot.op
+    getticket:
+      description: スロットチケットを手動で取得
+      usage: /getticket
+      permission: tamakake.slot.op
+      permission-message: "権限がありません"
