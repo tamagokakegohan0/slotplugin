@@ -20,7 +20,7 @@ import java.util.Random;
 public class SlotListener implements Listener {
 
     private final SlotPlugin plugin;
-    private final List<Player> spinningPlayers = new ArrayList<>(); // 連打防止
+    private final List<Player> spinningPlayers = new ArrayList<>();
 
     public SlotListener(SlotPlugin plugin) {
         this.plugin = plugin;
@@ -44,7 +44,7 @@ public class SlotListener implements Listener {
             return;
         }
 
-        // 手ぶらで右クリックしても通常スロットを回す
+        // 手ぶら
         if (item == null || item.getType() == Material.AIR) {
             e.setCancelled(true);
             List<ItemFrame> frames = getFrames(block);
@@ -56,34 +56,39 @@ public class SlotListener implements Listener {
             return;
         }
 
-        // チケット使用スロット
+        // 🎟️ チケット使用（IRON_NUGGET CMD 76）
         if (isTicket(item)) {
             e.setCancelled(true);
             item.setAmount(item.getAmount() - 1);
+
             List<ItemFrame> frames = getFrames(block);
             if (frames.size() != 3) {
                 player.sendMessage("§c額縁を3つ設置してください！");
                 return;
             }
+
             startTicketSlot(player, frames);
             return;
         }
 
-        // スロット設置ツールの場合
+        // スロット棒
         if (item.getType() == Material.STICK && item.hasItemMeta()
                 && item.getItemMeta().hasCustomModelData()
                 && item.getItemMeta().getCustomModelData() == 9999) {
+
             e.setCancelled(true);
+
             List<ItemFrame> frames = getFrames(block);
             if (frames.size() != 3) {
                 player.sendMessage("§c額縁を3つ設置してください！");
                 return;
             }
+
             startSlot(player, frames);
         }
     }
 
-    // 通常スロット
+    // 🎰 通常スロット
     public void startSlot(Player player, List<ItemFrame> frames) {
 
         int cost = 1000;
@@ -109,8 +114,7 @@ public class SlotListener implements Listener {
             public void run() {
 
                 for (ItemFrame frame : frames) {
-                    ItemStack randomItem = items.get(random.nextInt(items.size()));
-                    frame.setItem(randomItem);
+                    frame.setItem(items.get(random.nextInt(items.size())));
                 }
 
                 count++;
@@ -129,11 +133,11 @@ public class SlotListener implements Listener {
                             player.sendMessage("§a大当たり！チケットゲット！");
                             player.getInventory().addItem(getTicket());
                         } else if (a.getType() == Material.DIAMOND) {
-                            player.sendMessage("§a当たり！1万円ゲット！");
                             SlotPlugin.econ.depositPlayer(player, 10000);
+                            player.sendMessage("§a1万円ゲット！");
                         } else if (a.getType() == Material.EMERALD) {
-                            player.sendMessage("§a大当たり！10万円ゲット！");
                             SlotPlugin.econ.depositPlayer(player, 100000);
+                            player.sendMessage("§a10万円ゲット！");
                         } else {
                             player.sendMessage("§a当たりました！");
                         }
@@ -146,7 +150,7 @@ public class SlotListener implements Listener {
         }.runTaskTimer(plugin, 0, 2);
     }
 
-    // チケット専用スロット
+    // 🎟️ チケットスロット
     public void startTicketSlot(Player player, List<ItemFrame> frames) {
 
         spinningPlayers.add(player);
@@ -159,10 +163,8 @@ public class SlotListener implements Listener {
             @Override
             public void run() {
 
-                // 左→右→最後中央に向かう順番
                 for (int i = 0; i < frames.size(); i++) {
-                    ItemStack randomItem = getTicketSlotItems().get(random.nextInt(getTicketSlotItems().size()));
-                    frames.get(i).setItem(randomItem);
+                    frames.get(i).setItem(getTicketSlotItems().get(random.nextInt(3)));
                 }
 
                 count++;
@@ -171,21 +173,16 @@ public class SlotListener implements Listener {
                     cancel();
                     spinningPlayers.remove(player);
 
-                    ItemStack left = frames.get(0).getItem();
-                    ItemStack middle = frames.get(1).getItem();
-                    ItemStack right = frames.get(2).getItem();
+                    ItemStack a = frames.get(0).getItem();
+                    ItemStack b = frames.get(1).getItem();
+                    ItemStack c = frames.get(2).getItem();
 
-                    // CMD19が左・中央・右揃ったら当たり
-                    if (left.getType() == Material.IRON_NUGGET
-                            && middle.getType() == Material.IRON_NUGGET
-                            && right.getType() == Material.IRON_NUGGET
-                            && left.getItemMeta().getCustomModelData() == 19
-                            && middle.getItemMeta().getCustomModelData() == 19
-                            && right.getItemMeta().getCustomModelData() == 19) {
+                    if (a.getItemMeta().getCustomModelData() == 19 &&
+                            b.getItemMeta().getCustomModelData() == 19 &&
+                            c.getItemMeta().getCustomModelData() == 19) {
 
-                        player.sendMessage("§aチケットスロット大当たり！100万円ゲット！");
                         SlotPlugin.econ.depositPlayer(player, 1000000);
-
+                        player.sendMessage("§a100万円ゲット！");
                     } else {
                         player.sendMessage("§c外れました。");
                     }
@@ -194,37 +191,35 @@ public class SlotListener implements Listener {
         }.runTaskTimer(plugin, 0, 2);
     }
 
-    // チケット作成
+    // 🎟️ チケット作成（←ここが重要）
     public ItemStack getTicket() {
-        ItemStack item = new ItemStack(Material.PAPER);
+        ItemStack item = new ItemStack(Material.IRON_NUGGET);
         ItemMeta meta = item.getItemMeta();
 
         if (meta != null) {
             meta.setDisplayName("§eスロットチケット");
-            meta.setCustomModelData(7777);
+            meta.setCustomModelData(76); // ←ここ変更
             item.setItemMeta(meta);
         }
 
         return item;
     }
 
-    // チケット判定
+    // 🎟️ チケット判定
     public boolean isTicket(ItemStack item) {
         if (item == null) return false;
+        if (item.getType() != Material.IRON_NUGGET) return false;
         if (!item.hasItemMeta()) return false;
         if (!item.getItemMeta().hasCustomModelData()) return false;
-        return item.getItemMeta().getCustomModelData() == 7777;
+        return item.getItemMeta().getCustomModelData() == 76;
     }
 
-    // 比較
     public boolean isSame(ItemStack a, ItemStack b) {
         if (a == null || b == null) return false;
         return a.isSimilar(b);
     }
 
-    // 額縁取得
     public List<ItemFrame> getFrames(Block block) {
-
         List<ItemFrame> frames = new ArrayList<>();
 
         for (Entity entity : block.getWorld().getNearbyEntities(block.getLocation(), 3, 3, 3)) {
@@ -234,11 +229,9 @@ public class SlotListener implements Listener {
         }
 
         frames.sort(Comparator.comparingDouble(f -> f.getLocation().getX()));
-
         return frames;
     }
 
-    // 通常スロットアイテム
     private List<ItemStack> getSlotItems() {
         List<ItemStack> items = new ArrayList<>();
         items.add(createItem(Material.COPPER_INGOT, 1));
@@ -250,16 +243,14 @@ public class SlotListener implements Listener {
         return items;
     }
 
-    // チケット専用スロットアイテム
     private List<ItemStack> getTicketSlotItems() {
         List<ItemStack> items = new ArrayList<>();
-        items.add(createItem(Material.IRON_NUGGET, 19)); // 当たり
-        items.add(createItem(Material.IRON_NUGGET, 21)); // 外れ
-        items.add(createItem(Material.IRON_NUGGET, 22)); // 外れ
+        items.add(createItem(Material.IRON_NUGGET, 19));
+        items.add(createItem(Material.IRON_NUGGET, 21));
+        items.add(createItem(Material.IRON_NUGGET, 22));
         return items;
     }
 
-    // アイテム作成
     private ItemStack createItem(Material material, int cmd) {
         ItemStack item = new ItemStack(material);
         ItemMeta meta = item.getItemMeta();
