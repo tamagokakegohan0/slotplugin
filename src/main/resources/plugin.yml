@@ -1,0 +1,8 @@
+name: SlotPlugin
+main: tamakake.slotPlugin.SlotPlugin
+version: 1.0-SNAPSHOT
+
+commands:
+  giveslot:
+    description: スロットアイテム取得
+    permission: tamakake.slot.op
