@@ -1,13 +1,15 @@
 name: SlotPlugin
-main: tamakake.slotPlugin.SlotPlugin
 version: 1.0-SNAPSHOT
-
+main: tamakake.slotPlugin.SlotPlugin
+api-version: "1.21"
 commands:
   giveslot:
-    description: スロットアイテム取得
+    description: スロット設置ツールを取得
+    usage: /giveslot
     permission: tamakake.slot.op
-    getticket:
-      description: スロットチケットを手動で取得
-      usage: /getticket
-      permission: tamakake.slot.op
-      permission-message: "権限がありません"
+    permission-message: "権限がありません"
+  getticket:
+    description: スロットチケットを手動で取得
+    usage: /getticket
+    permission: tamakake.slot.op
+    permission-message: "権限がありません"
